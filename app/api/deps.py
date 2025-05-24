@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
@@ -9,14 +10,14 @@ from app.models.client import Client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncSession:
+    async with SessionLocal() as session:
+        yield session
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Client:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), 
+    db: AsyncSession = Depends(get_db)
+) -> Client:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Não autenticado",
@@ -30,12 +31,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError:
         raise credentials_exception
 
-    client = db.query(Client).filter(Client.id == int(client_id)).first()
+    result = await db.execute(select(Client).where(Client.id == int(client_id)))
+    client = result.scalars().first()
     if client is None:
         raise credentials_exception
     return client
 
-def require_admin(Client: Client = Depends(get_current_user)) -> Client:
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
-    return user
+async def require_admin(client: Client = Depends(get_current_user)) -> Client:
+    if not client.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores"
+        )
+    return client

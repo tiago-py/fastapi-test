@@ -1,8 +1,10 @@
 from pydantic import BaseModel, EmailStr
 
 class UserCreate(BaseModel):
+    name: str
     email: EmailStr
     password: str
+    cpf: int | None = None
 
 class UserOut(BaseModel):
     id: int

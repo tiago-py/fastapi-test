@@ -4,7 +4,7 @@ class ClientBase(BaseModel):
     name: str
     email: EmailStr
     cpf: constr(min_length=11, max_length=11)
-
+    hashed_password: str 
 class ClientCreate(ClientBase):
     pass
 

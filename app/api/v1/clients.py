@@ -1,53 +1,63 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List
-
-from app.schemas.client import ClientCreate, ClientUpdate, ClientOut
-from app.crud import client as crud_client
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
 from app.api.deps import get_db, get_current_user
+from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
+from app.crud import product as crud_product
 
 router = APIRouter()
 
-@router.get("/", response_model=List[ClientOut])
-def list_clients(
+@router.get("/", response_model=List[ProductOut])
+async def list_products(
     skip: int = 0,
     limit: int = 10,
-    name: str = Query(None),
-    email: str = Query(None),
-    db: Session = Depends(get_db),
+    section: Optional[str] = Query(None),
+    price: Optional[float] = Query(None),
+    available: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user)
 ):
-    return crud_client.get_clients(db, skip=skip, limit=limit, name=name, email=email)
+    return await crud_product.get_products(db, skip=skip, limit=limit, section=section, available=available, price=price)
 
-@router.post("/", response_model=ClientOut)
-def create_new_client(
-    client_in: ClientCreate,
-    db: Session = Depends(get_db),
+@router.post("/", response_model=ProductOut)
+async def create_product(
+    product_in: ProductCreate, 
+    db: AsyncSession = Depends(get_db), 
     _: str = Depends(get_current_user)
 ):
-    try:
-        return crud_client.create_client(db, client_in)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await crud_product.create_product(db, product_in)
 
-@router.get("/{client_id}", response_model=ClientOut)
-def get_client_by_id(client_id: int, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    db_client = crud_client.get_client(db, client_id)
-    if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    return db_client
+@router.get("/{product_id}", response_model=ProductOut)
+async def get_product(
+    product_id: int, 
+    db: AsyncSession = Depends(get_db), 
+    _: str = Depends(get_current_user)
+):
+    product = await crud_product.get_product(db, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    return product
 
-@router.put("/{client_id}", response_model=ClientOut)
-def update_client_by_id(client_id: int, client_in: ClientUpdate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    db_client = crud_client.get_client(db, client_id)
-    if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    return crud_client.update_client(db, db_client, client_in)
+@router.put("/{product_id}", response_model=ProductOut)
+async def update_product(
+    product_id: int, 
+    product_in: ProductUpdate, 
+    db: AsyncSession = Depends(get_db), 
+    _: str = Depends(get_current_user)
+):
+    db_product = await crud_product.get_product(db, product_id)
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    return await crud_product.update_product(db, db_product, product_in)
 
-@router.delete("/{client_id}")
-def delete_client_by_id(client_id: int, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    db_client = crud_client.get_client(db, client_id)
-    if not db_client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    crud_client.delete_client(db, db_client)
+@router.delete("/{product_id}")
+async def delete_product(
+    product_id: int, 
+    db: AsyncSession = Depends(get_db), 
+    _: str = Depends(get_current_user)
+):
+    db_product = await crud_product.get_product(db, product_id)
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    await crud_product.delete_product(db, db_product)
     return {"ok": True}

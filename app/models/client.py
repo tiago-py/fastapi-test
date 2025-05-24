@@ -1,15 +1,14 @@
-from sqlalchemy import Column, Integer, String, UniqueConstraint
+from sqlalchemy import Column, Integer, String, UniqueConstraint, Boolean
 from app.db.base import Base
+
 
 class Client(Base):
     __tablename__ = "clients"
+    
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=False)  # Make sure this matches your DB constraint
     email = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, unique=True, index=True, nullable=False)
-    cpf = Column(String(11), unique=True, index=True, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint("email", name="uq_client_email"),
-        UniqueConstraint("cpf", name="uq_client_cpf"),
-    )
+    hashed_password = Column(String, nullable=False)
+    cpf = Column(Integer)  # Make nullable if not required
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)

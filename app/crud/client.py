@@ -1,36 +1,49 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, select
+from sqlalchemy.future import select
 from app.models.client import Client
 from app.schemas.client import ClientCreate, ClientUpdate
 
-def get_client(db: Session, client_id: int):
-    return db.query(Client).filter(Client.id == client_id).first()
+async def get_client(db: AsyncSession, client_id: int):
+    result = await db.execute(select(Client).where(Client.id == client_id))
+    return result.scalars().first()
 
-def get_clients(db: Session, skip: int = 0, limit: int = 10, name: str = None, email: str = None):
-    query = db.query(Client)
+async def get_clients(db: AsyncSession, skip: int = 0, limit: int = 10, name: str = None, email: str = None):
+    query = select(Client)
     if name:
-        query = query.filter(Client.name.ilike(f"%{name}%"))
+        query = query.where(Client.name.ilike(f"%{name}%"))
     if email:
-        query = query.filter(Client.email.ilike(f"%{email}%"))
-    return query.offset(skip).limit(limit).all()
+        query = query.where(Client.email.ilike(f"%{email}%"))
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
 
-def create_client(db: Session, client_in: ClientCreate):
-    if db.query(Client).filter(or_(Client.email == client_in.email, Client.cpf == client_in.cpf)).first():
+async def create_client(db: AsyncSession, client_in: ClientCreate):
+    # Check for existing email or CPF
+    existing = await db.execute(
+        select(Client).where(
+            or_(Client.email == client_in.email, 
+                Client.cpf == client_in.cpf)
+        )
+    )
+    if existing.scalars().first():
         raise ValueError("Email ou CPF já cadastrados")
+    
     db_client = Client(**client_in.dict())
     db.add(db_client)
-    db.commit()
-    db.refresh(db_client)
+    await db.commit()
+    await db.refresh(db_client)
     return db_client
 
-def update_client(db: Session, db_client: Client, client_in: ClientUpdate):
+async def update_client(db: AsyncSession, db_client: Client, client_in: ClientUpdate):
     update_data = client_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_client, field, value)
-    db.commit()
-    db.refresh(db_client)
+    await db.commit()
+    await db.refresh(db_client)
     return db_client
 
-def delete_client(db: Session, db_client: Client):
-    db.delete(db_client)
-    db.commit()
+async def delete_client(db: AsyncSession, db_client: Client):
+    await db.delete(db_client)
+    await db.commit()
